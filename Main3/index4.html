@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ระบบสร้างโปสเตอร์ PM2.5 อัตโนมัติ</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Condensed:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Condensed:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
       body {
@@ -20,28 +19,61 @@
       .no-capture {
         display: none !important;
       }
+      /* === CSS ที่แก้ไขและเพิ่มเติม เริ่มต้น === */
+      .map-marker-container {
+        position: absolute;
+        transform: translate(-50%, -50%); /* ย้าย transform มาที่ container หลัก */
+      }
       .map-marker-dot {
         position: absolute;
-        width: 8px;
-        height: 8px;
+        top: 0;
+        left: 0;
+        width: 10px;
+        height: 10px;
         background-color: red;
         border-radius: 50%;
-        border: 1px solid white;
+        border: 2px solid white;
         transform: translate(-50%, -50%);
+        z-index: 99;
       }
-      .map-label {
+      .leader-line-svg {
         position: absolute;
-        background-color: rgba(255, 255, 255, 0.9);
-        color: black;
-        padding: 2px 6px;
-        border-radius: 4px;
+        top: 0;
+        left: 0;
+        overflow: visible;
+        z-index: 9;
+      }
+      .leader-line-svg line {
+        stroke: #333;
+        stroke-width: 1.5;
+      }
+      .map-label-content {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        z-index: 999;
+      }
+      .map-label-number {
+        z-index: 9999;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        margin-right: 5px;
+        border: 1px solid rgba(0,0,0,0.2);
+      }
+      .map-label-text {
+        padding: 3px 8px;
+        border-radius: 5px;
         font-size: 12px;
         font-weight: bold;
-        white-space: nowrap;
-        transform: translate(-50%, -50%);
-        border: 1px solid #ccc;
       }
-
+      /* === CSS ที่แก้ไขและเพิ่มเติม สิ้นสุด === */
       #top-5-list {
         position: absolute;
         top: 359px;
@@ -63,91 +95,32 @@
       #date-display {
         position: absolute;
         top: 238px;
-        left: 538px;
-        font-size: 18px;
+        left: 520px;
+        font-size: 20px;
         font-weight: bolder;
         color: #000000;
       }
-      [data-location-id='location-1'] {
-        top: 24.25%;
-        left: 31.75%;
-      }
-      [data-location-id='location-2'] {
-        top: 20%;
-        left: 37%;
-      }
-      [data-location-id='location-3'] {
-        top: 11%;
-        left: 31%;
-      }
-      [data-location-id='location-4'] {
-        top: 27.5%;
-        left: 12%;
-      }
-      [data-location-id='location-5'] {
-        top: 16%;
-        left: 9%;
-      }
-      [data-location-id='location-6'] {
-        top: 33%;
-        left: 22.65%;
-      }
-      [data-location-id='location-7'] {
-        top: 34%;
-        left: 43%;
-      }
-      [data-location-id='location-8'] {
-        top: 42.5%;
-        left: 20%;
-      }
-      [data-location-id='location-9'] {
-        top: 51%;
-        left: 24.5%;
-      }
-      [data-location-id='location-10'] {
-        top: 65.5%;
-        left: 45%;
-      }
-      [data-location-id='location-11'] {
-        top: 56.5%;
-        left: 39.5%;
-      }
-      [data-location-id='location-12'] {
-        top: 80.2%;
-        left: 53.2%;
-      }
-      [data-location-id='location-13'] {
-        top: 70.6%;
-        left: 47.1%;
-      }
-      [data-location-id='location-14'] {
-        top: 63%;
-        left: 48%;
-      }
-      [data-location-id='location-15'] {
-        top: 51%;
-        left: 46.3%;
-      }
-      [data-location-id='location-16'] {
-        top: 46%;
-        left: 44.5%;
-      }
-      [data-location-id='location-17'] {
-        top: 43.6%;
-        left: 42.6%;
-      }
-      [data-location-id='location-18'] {
-        top: 42%;
-        left: 37%;
-      }
-      [data-location-id='location-19'] {
-        top: 35%;
-        left: 35.8%;
-      }
-      [data-location-id='location-20'] {
-        top: 46%;
-        left: 34.8%;
-      }
+       /* ตำแหน่งของจุดบนแผนที่ (ไม่มีการเปลี่ยนแปลง) */
+      [data-location-id='location-1'] { top: 24.25%; left: 31.75%; }
+      [data-location-id='location-2'] { top: 20%; left: 37%; }
+      [data-location-id='location-3'] { top: 11%; left: 31%; }
+      [data-location-id='location-4'] { top: 27.5%; left: 12%; }
+      [data-location-id='location-5'] { top: 16%; left: 9%; }
+      [data-location-id='location-6'] { top: 33%; left: 22.65%; }
+      [data-location-id='location-7'] { top: 34%; left: 43%; }
+      [data-location-id='location-8'] { top: 42.5%; left: 20%; }
+      [data-location-id='location-9'] { top: 51%; left: 24.5%; }
+      [data-location-id='location-10'] { top: 65.5%; left: 45%; }
+      [data-location-id='location-11'] { top: 56.5%; left: 39.5%; }
+      [data-location-id='location-12'] { top: 80.2%; left: 53.2%; }
+      [data-location-id='location-13'] { top: 70.6%; left: 47.1%; }
+      [data-location-id='location-14'] { top: 63%; left: 48%; }
+      [data-location-id='location-15'] { top: 51%; left: 46.3%; }
+      [data-location-id='location-16'] { top: 46%; left: 44.5%; }
+      [data-location-id='location-17'] { top: 43.6%; left: 42.6%; }
+      [data-location-id='location-18'] { top: 42%; left: 37%; }
+      [data-location-id='location-19'] { top: 35%; left: 35.8%; }
+      [data-location-id='location-20'] { top: 46%; left: 34.8%; }
     </style>
   </head>
   <body class="bg-gray-100 p-4 sm:p-8">
@@ -211,6 +184,22 @@
               class="mt-1 block w-full md:w-1/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
+        </div>
+        <hr class="my-6">
+        
+        <div>
+            <label for="jsonInput" class="block text-sm font-medium text-gray-700">
+                ป้อนข้อมูลทั้งหมดในรูปแบบ JSON
+            </label>
+            <textarea id="jsonInput" rows="10" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder='[&#10;  { "name": "อาคาร KB", "value": 45.2 },&#10;  { "name": "คณะสหเวชศาสตร์", "value": 22.8 }&#10;]'></textarea>
+            <div class="mt-2 flex gap-x-2">
+                 <button id="processJsonBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                    นำเข้าข้อมูลจาก JSON
+                 </button>
+                 <button id="loadDemoDataBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                    ข้อมูลจำลอง
+                 </button>
+            </div>
         </div>
         <div id="locationList" class="mt-6"></div>
       </div>
@@ -281,7 +270,12 @@
       const mapMarkersContainer = document.getElementById('map-markers');
       const dateInput = document.getElementById('reportDate');
       const dateDisplay = document.getElementById('date-display');
-
+      
+      // --- Element ที่เพิ่มเข้ามา ---
+      const jsonInput = document.getElementById('jsonInput');
+      const processJsonBtn = document.getElementById('processJsonBtn');
+      const loadDemoDataBtn = document.getElementById('loadDemoDataBtn');
+      
       dateInput.valueAsDate = new Date();
       renderAll();
 
@@ -289,6 +283,70 @@
       captureBtn.addEventListener('click', capturePoster);
       dateInput.addEventListener('change', updateDateDisplay);
       locationListDiv.addEventListener('click', handleListClick);
+
+      // --- Event Listener ที่เพิ่มเข้ามา ---
+      loadDemoDataBtn.addEventListener('click', loadDemoData);
+      processJsonBtn.addEventListener('click', processJsonData);
+      
+
+      // --- ฟังก์ชันที่เพิ่มเข้ามา เริ่มต้น ---
+      function loadDemoData() {
+        const demoData = [
+          { name: 'อาคาร KB', value: 85.2 },
+          { name: 'หอพักนิสิตแพทย์', value: 78.9 },
+        
+          { name: 'คณะสหเวชศาสตร์', value: 55.4 },
+          { name: 'สำนักงานอธิการบดี', value: 48.3 },
+          { name: 'คณะมนุษย์ฯ', value: 33.7 },
+          { name: 'สำนักหอสมุด', value: 29.5 },
+          { name: 'โรงอาหารโภชนาคาร', value: 21.0 },
+          { name: 'คณะบริหาร', value: 18.9 },
+          { name: 'สระว่ายน้ำ', value: 12.5 },
+        ];
+        // แปลง Object เป็น String JSON ที่จัดรูปแบบสวยงาม
+        jsonInput.value = JSON.stringify(demoData, null, 2); 
+      }
+
+      function processJsonData() {
+        const jsonString = jsonInput.value;
+        jsonInput.classList.remove('border-red-500', 'border-green-500');
+
+        if (!jsonString.trim()) {
+            alert('กรุณาป้อนข้อมูล JSON');
+            jsonInput.classList.add('border-red-500');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(jsonString);
+            if (!Array.isArray(data)) {
+                throw new Error('ข้อมูลต้องเป็น Array');
+            }
+            // ตรวจสอบว่าทุก object มี key 'name' และ 'value'
+            const isValid = data.every(item => 
+                typeof item === 'object' &&
+                item !== null &&
+                'name' in item &&
+                'value' in item &&
+                typeof item.name === 'string' &&
+                typeof item.value === 'number'
+            );
+
+            if (!isValid) {
+                throw new Error("ข้อมูลใน Array ไม่ถูกต้อง ทุกๆ item ต้องมี { name: 'ชื่อสถานที่', value: ค่าฝุ่น }");
+            }
+            
+            // แทนที่ข้อมูลเก่าด้วยข้อมูลใหม่จาก JSON
+            enteredLocations = data; 
+            renderAll();
+            jsonInput.classList.add('border-green-500');
+
+        } catch (error) {
+            alert('รูปแบบ JSON ไม่ถูกต้อง: ' + error.message);
+            jsonInput.classList.add('border-red-500');
+        }
+      }
+      // --- ฟังก์ชันที่เพิ่มเข้ามา สิ้นสุด ---
 
       function populateLocationSuggestions() {
         locationSuggestionsDatalist.innerHTML = '';
@@ -380,15 +438,15 @@
 
       function getDustColorClasses(value) {
         if (value <= 15.0) {
-          return { bg: 'bg-cyan-500', text: 'text-black' }; // ฟ้า
+          return { bg: 'bg-cyan-500', text: 'text-white' }; // ฟ้า
         } else if (value <= 25.0) {
-          return { bg: 'bg-green-500', text: 'text-black' }; // เขียว
+          return { bg: 'bg-green-500', text: 'text-white' }; // เขียว
         } else if (value <= 37.5) {
-          return { bg: 'bg-yellow-400', text: 'text-black' }; // เหลือง
+          return { bg: 'bg-yellow-500', text: 'text-white' }; // เหลือง
         } else if (value <= 75.0) {
-          return { bg: 'bg-orange-500', text: 'text-black' }; // ส้ม
+          return { bg: 'bg-orange-500', text: 'text-white' }; // ส้ม
         } else {
-          return { bg: 'bg-red-600', text: 'text-black' }; // แดง
+          return { bg: 'bg-red-600', text: 'text-white' }; // แดง (ปรับตัวหนังสือเป็นสีขาว)
         }
       }
 
@@ -405,11 +463,11 @@
           div.className = 'flex justify-between items-center';
           const color = getDustColorClasses(loc.value);
           div.innerHTML = `
-                    <span class="pr-4">${loc.name}</span>
-                    <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
-                        <span class="text-2xl font-bold mr-2">${loc.value}</span>
-                        <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
-                    </div>`;
+                          <span class="pr-4">${loc.name}</span>
+                          <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
+                              <span class="text-2xl font-bold mr-2">${loc.value}</span>
+                              <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
+                          </div>`;
           top5List.appendChild(div);
         });
 
@@ -422,64 +480,113 @@
           div.className = 'flex justify-between items-center';
           const color = getDustColorClasses(loc.value);
           div.innerHTML = `
-                    <span class="pr-4">${loc.name}</span>
-                    <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
-                        <span class="text-2xl font-bold mr-2">${loc.value}</span>
-                        <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
-                    </div>`;
+                          <span class="pr-4">${loc.name}</span>
+                          <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
+                              <span class="text-2xl font-bold mr-2">${loc.value}</span>
+                              <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
+                          </div>`;
           bottom5List.appendChild(div);
         });
       }
 
+      // === ฟังก์ชัน renderMapMarkers ที่แก้ไขใหม่ ===
       function renderMapMarkers() {
-        mapMarkersContainer.innerHTML = ''; // 1. จัดเรียงข้อมูลเพื่อหา 5 อันดับแรก (เหมือนใน renderRankings)
+        mapMarkersContainer.innerHTML = '';
+        
+        // กำหนดตำแหน่งการโยงเส้นของป้าย เพื่อป้องกันการทับกัน
+        // ค่า x, y คือระยะห่างจากจุดศูนย์กลาง (หน่วยเป็น pixel)
+        const labelOffsets = {
+            'location-5': { x: -30, y: -45 }, // หอพักนิสิตแพทย์: ไปทางซ้ายบน
+            'location-4': { x: -40, y: 30 },  // คณะสหเวชศาสตร์: ไปทางซ้ายล่าง
+            'location-3': { x: 0,   y: -30 },  // ป้ายรถหน้ามหาวิทยาลัย: ไปด้านบนตรงๆ
+            'location-2': { x: 40,  y: -40 },  // อาคาร KB: ไปทางขวาบน
+            'location-1': { x: 50,  y: 30 },   // สำนักงานอธิการบดี: ไปทางขวาล่าง
+            
+        };
 
         const sortedHigh = [...enteredLocations].sort(
           (a, b) => b.value - a.value
         );
-        const top5 = sortedHigh.slice(0, 5); // 2. วนลูปเฉพาะ 5 อันดับแรก และใช้ 'index' เพื่อรับลำดับ (0, 1, 2, 3, 4)
+        const top5 = sortedHigh.slice(0, 5);
 
         top5.forEach((enteredLoc, index) => {
           const mapInfo = mapLocations.find(
             (ml) => ml.name === enteredLoc.name
           );
-          if (mapInfo) {
-            const label = document.createElement('div');
-            label.className = 'map-label';
-            label.dataset.locationId = mapInfo.id; // 3. แสดงผลเป็นเลขอันดับ (index + 1)
-  
-            label.textContent = `(${index + 1}) ${enteredLoc.name}`;
-            const color = getDustColorClasses(enteredLoc.value);
-            label.classList.remove('bg-white', 'text-black');
-            label.classList.add(color.bg, color.text);
 
-            mapMarkersContainer.appendChild(label);
+          if (mapInfo) {
+            const container = document.createElement('div');
+            container.className = 'map-marker-container';
+            container.dataset.locationId = mapInfo.id;
+
+            const dot = document.createElement('div');
+            dot.className = 'map-marker-dot';
+            
+            const offset = labelOffsets[mapInfo.id] || { x: 15, y: -25 };
+            
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'leader-line-svg');
+            
+            const line = document.createElementNS(svgNS, 'line');
+            line.setAttribute('x1', '0');
+            line.setAttribute('y1', '0');
+            line.setAttribute('x2', String(offset.x));
+            line.setAttribute('y2', String(offset.y));
+            svg.appendChild(line);
+
+            const labelContent = document.createElement('div');
+            labelContent.className = 'map-label-content';
+
+            // --- จุดที่แก้ไข ---
+            // เนื่องจากวงกลมตัวเลขมีขนาด 20x20px จุดศูนย์กลางจึงอยู่ที่ 10px
+            // เราจึงต้องเลื่อนป้ายทั้งหมดไปทางซ้าย 10px และขึ้นไปข้างบน 10px
+            // เพื่อให้ "จุดศูนย์กลางของวงกลม" มาอยู่ที่ปลายเส้นพอดี
+            labelContent.style.transform = `translate(calc(${offset.x}px - 10px), calc(${offset.y}px - 10px))`;
+            // --- สิ้นสุดจุดที่แก้ไข ---
+
+            const color = getDustColorClasses(enteredLoc.value);
+
+            const numberCircle = document.createElement('div');
+            numberCircle.className = `map-label-number ${color.bg} ${color.text}`;
+            numberCircle.textContent = index + 1;
+
+            const labelText = document.createElement('div');
+            labelText.className = `map-label-text ${color.bg} ${color.text}`;
+            labelText.textContent = enteredLoc.name;
+
+            labelContent.appendChild(numberCircle);
+            labelContent.appendChild(labelText);
+            
+            container.appendChild(dot);
+            container.appendChild(svg);
+            container.appendChild(labelContent);
+            mapMarkersContainer.appendChild(container);
           }
         });
       }
-      
+
       async function capturePoster() {
         const captureButton = document.getElementById('captureBtn');
         const originalButtonText = captureButton.innerHTML;
         captureButton.innerHTML = 'กำลังประมวลผล...';
-        captureButton.disabled = true; // 1. ซ่อนปุ่มและส่วนควบคุม
+        captureButton.disabled = true;
 
         const elementsToHide = [
           document.getElementById('controls'),
           captureButton,
         ];
-        elementsToHide.forEach((el) => el && el.classList.add('no-capture')); // 2. (สำคัญ) หน่วงเวลาเล็กน้อย ให้ CSS หายไปแสดงผลเสร็จ
+        elementsToHide.forEach((el) => el && el.classList.add('no-capture'));
 
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         const node = document.getElementById('posterContainer');
 
         try {
-          // 3. ใช้คำสั่ง htmlToImage.toPng
           const dataUrl = await htmlToImage.toPng(node, {
-            quality: 1.0, // คุณภาพ (0 - 1.0)
-            pixelRatio: 2, // เพิ่มความละเอียด (เหมือน scale: 2) // (ไลบรารี่นี้มักจะจัดการเรื่อง scroll และ font ได้ดีกว่า)
-          }); // 4. สร้าง Link ดาวน์โหลด
+            quality: 1.0,
+            pixelRatio: 2,
+          });
 
           const link = document.createElement('a');
           link.download = `pm25-poster-${dateInput.value}.png`;
@@ -488,7 +595,6 @@
         } catch (err) {
           console.error('Oops, something went wrong!', err);
         } finally {
-          // 5. แสดงปุ่มและส่วนควบคุมกลับมา
           elementsToHide.forEach(
             (el) => el && el.classList.remove('no-capture')
           );
@@ -496,7 +602,6 @@
           captureButton.disabled = false;
         }
       }
-     
     </script>
   </body>
 </html>
