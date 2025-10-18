@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>สรุปสถานการณ์ฝุ่น PM2.5 ม.บูรพา</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      /* --- การตั้งค่าพื้นฐาน --- */
+      body {
+        font-family: 'Sarabun', sans-serif;
+        background-color: #555; /* สีพื้นหลังเว็บเพื่อให้เห็นขอบโปสเตอร์ */
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      /* --- กรอบโปสเตอร์หลัก --- */
+      .poster {
+        width: 3080px;
+        height: 1650px;
+        background-image: url('My_poster.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        position: relative; /* สำคัญมาก! สำหรับเป็นจุดอ้างอิง */
+
+      }
+
+      /* --- ส่วนของวันที่ --- */
+      .date-section {
+        position: absolute;
+        top: 40px;
+        left: 280px;
+        width: 480px;
+        text-align: center;
+      }
+      .date-section p {
+        margin: 0;
+        font-size: 38px;
+        font-weight: 700;
+        color: #004d88;
+      }
+
+      /* --- ส่วนของตารางข้อมูล (ใช้ร่วมกัน) --- */
+      .ranking-section {
+        position: absolute;
+        left: 450px;
+        width: 590px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px; /* ระยะห่างระหว่างบรรทัด */
+      }
+      .top-5 {
+        top: 350px;
+      }
+      .bottom-5 {
+        top: 750px;
+      }
+
+      /* --- สไตล์ของข้อมูลแต่ละแถว --- */
+      .list-item {
+        display: flex;
+        align-items: center;
+        height: 34px;
+      }
+      .rank-number {
+        font-weight: 700;
+        font-size: 34px;
+        color: #333;
+        width: 60px;
+        text-align: center;
+      }
+      .location-name {
+        flex-grow: 1; /* ทำให้ชื่อสถานที่ยืดเต็มพื้นที่ที่เหลือ */
+        font-size: 34px;
+        color: #333;
+        padding-left: 10px;
+      }
+      .pm-value {
+        font-weight: 700;
+        font-size: 60px;
+        width: 90px;
+        text-align: center;
+      }
+      .unit {
+        font-size: 18px;
+        line-height: 1.1;
+        width: 50px;
+        color: #555;
+      }
+
+      /* --- โค้ดสีสำหรับค่าฝุ่น --- */
+      .color-blue {
+        color: #009de0;
+      } /* ดีมาก */
+      .color-green {
+        color: #00af50;
+      } /* ดี */
+      .color-yellow {
+        color: #ffc000;
+      } /* ปานกลาง */
+      .color-orange {
+        color: #ff7a00;
+      } /* เริ่มมีผล */
+      .color-red {
+        color: #ed1c24;
+      } /* มีผล */
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="poster">
+      <div class="date-section">
+        <p>ประจำวันที่ 16 ตุลาคม 2568</p>
+      </div>
+
+      <div class="ranking-section top-5">
+        <div class="list-item">
+          <span class="rank-number">1</span>
+          <span class="location-name">สำนักงานอธิการบดี</span>
+          <span class="pm-value color-green">18</span>
+         
+        </div>
+        <div class="list-item">
+          <span class="rank-number">2</span>
+          <span class="location-name">โรงเรียนสาธิตฯ มัธยม</span>
+          <span class="pm-value color-green">16</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">3</span>
+          <span class="location-name">โรงเรียนสาธิตฯ</span>
+          <span class="pm-value color-blue">14</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">4</span>
+          <span class="location-name">หอพักนานาชาติ</span>
+          <span class="pm-value color-blue">14</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">5</span>
+          <span class="location-name">หอสมุด</span>
+          <span class="pm-value color-blue">12</span>
+          
+        </div>
+      </div>
+
+      <div class="ranking-section bottom-5">
+        <div class="list-item">
+          <span class="rank-number">1</span>
+          <span class="location-name">สำนักบริการวิชาการ</span>
+          <span class="pm-value color-blue">5</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">2</span>
+          <span class="location-name">อาคารคณะพยาบาลศาสตร์</span>
+          <span class="pm-value color-blue">5</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">3</span>
+          <span class="location-name">หอพักเทาทอง 2</span>
+          <span class="pm-value color-blue">6</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">4</span>
+          <span class="location-name">หอพักเทาทอง 4</span>
+          <span class="pm-value color-blue">7</span>
+          
+        </div>
+        <div class="list-item">
+          <span class="rank-number">5</span>
+          <span class="location-name">สระว่ายน้ำ</span>
+          <span class="pm-value color-blue">7</span>
+          
+        </div>
+      </div>
+    </div>
+    <div class="download-container">
+        <button id="downloadBtn">ดาวน์โหลดโปสเตอร์เป็นภาพ</button>
+    </div>
+    
+  <script>
+    // 1. เลือกปุ่มและโปสเตอร์ที่เราจะใช้งาน
+    const downloadButton = document.getElementById('downloadBtn');
+    const posterElement = document.querySelector('.poster');
+
+    // 2. เมื่อมีการคลิกที่ปุ่ม
+    downloadButton.addEventListener('click', () => {
+        console.log('กำลังสร้างรูปภาพ...');
+        
+        // 3. สั่งให้ html2canvas แปลง .poster เป็นภาพ
+        html2canvas(posterElement, {
+            useCORS: true, // อนุญาตให้โหลดภาพจากแหล่งอื่น (สำคัญถ้าพื้นหลังมาจาก URL)
+            scale: 2       // เพิ่มความละเอียดของภาพเป็น 2 เท่า (คมชัดขึ้น)
+        }).then(canvas => {
+            // 4. เมื่อได้ภาพ (canvas) มาแล้ว ให้สร้างลิงก์สำหรับดาวน์โหลด
+            const link = document.createElement('a');
+            
+            // ตั้งชื่อไฟล์ตามวันที่ปัจจุบัน
+            const today = new Date();
+            const dateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            link.download = `PM2.5-Report-${dateString}.png`;
+            
+            // แปลง canvas เป็นข้อมูลภาพ PNG แล้วกำหนดให้เป็น URL ของลิงก์
+            link.href = canvas.toDataURL('image/png');
+            
+            // 5. สั่งให้เบราว์เซอร์คลิกลิงก์นี้โดยอัตโนมัติเพื่อเริ่มดาวน์โหลด
+            link.click();
+            console.log('ดาวน์โหลดสำเร็จ!');
+        });
+    });
+</script>
+</body>
+</html>

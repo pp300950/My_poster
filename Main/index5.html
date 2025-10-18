@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสร้างโปสเตอร์ PM2.5 อัตโนมัติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+        .no-capture {
+            display: none !important;
+        }
+        .map-marker-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: red;
+            border-radius: 50%;
+            border: 1px solid white;
+            transform: translate(-50%, -50%);
+        }
+        .map-label {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: black;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            border: 1px solid #ccc;
+        }
+
+        /* ----- ตำแหน่งที่คุณได้แก้ไขแล้ว ----- */
+        #top-5-list {
+            position: absolute;
+            top: 359px; 
+            left: 518px;
+            width: 280px;
+            font-size: 14px;
+            font-weight: bolder;
+            line-height: 2.3;
+        }
+        #bottom-5-list {
+            position: absolute;
+            top: 650px;
+            left: 518px;
+            width: 280px;
+            font-size: 14px;
+            font-weight: bolder;
+            /* ปรับ line-height เพื่อให้ระยะห่างเหมาะสม */
+            line-height: 2.3;
+        }
+        #date-display {
+            position: absolute;
+            top: 238px;
+            left: 538px;
+            font-size: 18px;
+            font-weight: bolder;
+            color: #000000;
+        }
+        [data-location-id='location-1'] { top: 24.25%; left: 31.75%; }
+        [data-location-id='location-2'] { top: 20%; left: 37%; }
+        [data-location-id='location-3'] { top: 11%; left: 31%; }
+        [data-location-id='location-4'] { top: 27.5%; left: 12%; }
+        [data-location-id='location-5'] { top: 16%; left: 9%; }
+        [data-location-id='location-6'] { top: 33%; left: 22.65%; }
+        [data-location-id='location-7'] { top: 34%; left: 43%; }
+        [data-location-id='location-8'] { top: 42.5%; left: 20%; }
+        [data-location-id='location-9'] { top: 51%; left: 24.5%; }
+        [data-location-id='location-10'] { top: 65.5%; left: 45%; }
+        [data-location-id='location-11'] { top: 56.5%; left: 39.5%; }
+        [data-location-id='location-12'] { top: 80.2%; left: 53.2%; }
+        [data-location-id='location-13'] { top: 70.6%; left: 47.1%; }
+        [data-location-id='location-14'] { top: 63%; left: 48%; }
+        [data-location-id='location-15'] { top: 51%; left: 46.3%; }
+        [data-location-id='location-16'] { top: 46%; left: 44.5%; }
+        [data-location-id='location-17'] { top: 43.6%; left: 42.6%; }
+        [data-location-id='location-18'] { top: 42%; left: 37%; }
+        [data-location-id='location-19'] { top: 35%; left: 35.8%; }
+        [data-location-id='location-20'] { top: 46%; left: 34.8%; }
+        /* ----- สิ้นสุดตำแหน่งที่คุณแก้ไข ----- */
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4 text-gray-800">ระบบสร้างโปสเตอร์ PM2.5 อัตโนมัติ</h1>
+
+        <div id="controls" class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="locationName" class="block text-sm font-medium text-gray-700">ชื่อสถานที่</label>
+                    <input type="text" id="locationName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="เช่น อาคาร KB" list="locationSuggestions">
+                    <datalist id="locationSuggestions"></datalist>
+                </div>
+                <div>
+                    <label for="dustValue" class="block text-sm font-medium text-gray-700">ค่าฝุ่น (PM2.5)</label>
+                    <input type="number" id="dustValue" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="เช่น 35">
+                </div>
+                <div class="self-end">
+                    <button id="addLocationBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors">เพิ่มสถานที่</button>
+                </div>
+            </div>
+            <!-- ----- ส่วนที่เพิ่มเข้ามา: ช่องสำหรับปรับตำแหน่ง ----- -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                    <label for="reportDate" class="block text-sm font-medium text-gray-700">วันที่สรุปผล</label>
+                    <input type="date" id="reportDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="yOffset" class="block text-sm font-medium text-gray-700">ปรับตำแหน่งแนวตั้ง (Y Offset)</label>
+                    <input type="number" id="yOffset" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" value="0" title="ใส่ค่าบวกเพื่อเลื่อนลง, ค่าลบเพื่อเลื่อนขึ้น">
+                    <p class="text-xs text-gray-500 mt-1">ค่าบวก = เลื่อนลง, ค่าลบ = เลื่อนขึ้น</p>
+                </div>
+            </div>
+            <!-- --------------------------------------------------- -->
+            <div id="locationList" class="mt-6"></div>
+        </div>
+
+        <div class="flex flex-col items-center">
+            <button id="captureBtn" class="mb-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors">ดาวน์โหลดรูปภาพโปสเตอร์</button>
+            
+            <div id="posterContainer" class="relative shadow-lg" style="width: 800px; height: 1131px; background-size: cover; background-position: center; background-image: url('template.png');">
+                <div id="date-display"></div>
+                <div id="top-5-list" class="space-y-2 text-gray-800"></div>
+                <div id="bottom-5-list" class="space-y-2 text-gray-800"></div>
+                <div id="map-markers"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mapLocations = [
+            { id: 'location-1', name: 'สำนักงานอธิการบดี' }, { id: 'location-2', name: 'อาคาร KB' }, { id: 'location-3', name: 'ป้ายรถหน้ามหาวิทยาลัย' }, { id: 'location-4', name: 'คณะสหเวชศาสตร์' }, { id: 'location-5', name: 'หอพักนิสิตแพทย์' }, { id: 'location-6', name: 'หอพักนานาชาติ' }, { id: 'location-7', name: 'สำนักหอสมุด' }, { id: 'location-8', name: 'โรงเรียนสาธิตฯ' }, { id: 'location-9', name: 'โรงเรียนสาธิตฯ อินเตอร์' }, { id: 'location-10', name: 'คณะบริหาร' }, { id: 'location-11', name: 'สระว่ายน้ำ' }, { id: 'location-12', name: 'อาคารที่พักบุคลากร' }, { id: 'location-13', name: 'อาคารพักอาศัยเสนาะ' }, { id: 'location-14', name: 'หอพักเทาทอง 4' }, { id: 'location-15', name: 'หอพักเทาทอง 2' }, { id: 'location-16', name: 'โรงอาหารโภชนาคาร' }, { id: 'location-17', name: 'ลานเกือกม้า' }, { id: 'location-18', name: 'ป้ายรถกองกิจ' }, { id: 'location-19', name: 'สำนักบริการวิชาการ' }, { id: 'location-20', name: 'คณะมนุษย์ฯ' },
+        ];
+        let enteredLocations = [];
+
+        const locationSuggestionsDatalist = document.getElementById('locationSuggestions');
+        const locationNameInput = document.getElementById('locationName');
+        const dustValueInput = document.getElementById('dustValue');
+        const addLocationBtn = document.getElementById('addLocationBtn');
+        const locationListDiv = document.getElementById('locationList');
+        const captureBtn = document.getElementById('captureBtn');
+        const posterContainer = document.getElementById('posterContainer');
+        const top5List = document.getElementById('top-5-list');
+        const bottom5List = document.getElementById('bottom-5-list');
+        const mapMarkersContainer = document.getElementById('map-markers');
+        const dateInput = document.getElementById('reportDate');
+        const dateDisplay = document.getElementById('date-display');
+        const yOffsetInput = document.getElementById('yOffset'); // เพิ่มตัวแปรสำหรับ input ใหม่
+
+        dateInput.valueAsDate = new Date();
+        renderAll();
+
+        addLocationBtn.addEventListener('click', addLocation);
+        captureBtn.addEventListener('click', capturePoster);
+        dateInput.addEventListener('change', updateDateDisplay);
+        locationListDiv.addEventListener('click', handleListClick);
+
+        function populateLocationSuggestions() {
+            locationSuggestionsDatalist.innerHTML = '';
+            const enteredNames = enteredLocations.map((loc) => loc.name);
+            const availableLocations = mapLocations.filter((loc) => !enteredNames.includes(loc.name));
+            availableLocations.forEach((loc) => {
+                const option = document.createElement('option');
+                option.value = loc.name;
+                locationSuggestionsDatalist.appendChild(option);
+            });
+        }
+
+        function updateDateDisplay() {
+            const date = new Date(dateInput.value);
+            if (!isNaN(date)) {
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                dateDisplay.textContent = 'ประจำวันที่ ' + date.toLocaleDateString('th-TH', options);
+            }
+        }
+        
+        function addLocation() {
+            const name = locationNameInput.value.trim();
+            const value = parseFloat(dustValueInput.value);
+            if (name && !isNaN(value)) {
+                const existingLocation = enteredLocations.find((loc) => loc.name === name);
+                if (existingLocation) {
+                    existingLocation.value = value;
+                } else {
+                    enteredLocations.push({ name, value });
+                }
+                locationNameInput.value = '';
+                dustValueInput.value = '';
+                locationNameInput.focus();
+                renderAll();
+            } else {
+                if (!name) locationNameInput.classList.add('border-red-500');
+                if (isNaN(value)) dustValueInput.classList.add('border-red-500');
+                
+                setTimeout(() => {
+                    locationNameInput.classList.remove('border-red-500');
+                    dustValueInput.classList.remove('border-red-500');
+                }, 2000);
+            }
+        }
+
+        function handleListClick(e) {
+            if (e.target.classList.contains('remove-btn')) {
+                const nameToRemove = e.target.dataset.name;
+                enteredLocations = enteredLocations.filter((loc) => loc.name !== nameToRemove);
+                renderAll();
+            }
+        }
+
+        function renderAll() {
+            renderEnteredList();
+            renderRankings();
+            renderMapMarkers();
+            populateLocationSuggestions();
+            updateDateDisplay();
+        }
+
+        function renderEnteredList() {
+            locationListDiv.innerHTML = '';
+            if (enteredLocations.length === 0) {
+                locationListDiv.innerHTML = '<p class="text-gray-500 text-sm">ยังไม่มีสถานที่ที่เพิ่มเข้ามา</p>';
+                return;
+            }
+            const list = document.createElement('ul');
+            list.className = 'space-y-2';
+            [...enteredLocations].sort((a,b) => a.name.localeCompare(b.name)).forEach((loc) => {
+                const item = document.createElement('li');
+                item.className = 'flex justify-between items-center bg-gray-50 p-2 rounded-md';
+                item.innerHTML = `<span><span class="font-semibold">${loc.name}</span>: ${loc.value}</span><button data-name="${loc.name}" class="remove-btn text-red-500 hover:text-red-700 font-bold">ลบ</button>`;
+                list.appendChild(item);
+            });
+            locationListDiv.appendChild(list);
+        }
+
+        function getDustColorClasses(value) {
+            if (value <= 15.0) {
+                return { bg: 'bg-cyan-500', text: 'text-white' }; // ฟ้า
+            } else if (value <= 25.0) {
+                return { bg: 'bg-green-500', text: 'text-white' }; // เขียว
+            } else if (value <= 37.5) {
+                return { bg: 'bg-yellow-400', text: 'text-black' }; // เหลือง
+            } else if (value <= 75.0) {
+                return { bg: 'bg-orange-500', text: 'text-white' }; // ส้ม
+            } else {
+                return { bg: 'bg-red-600', text: 'text-white' }; // แดง
+            }
+        }
+
+        function renderRankings() {
+            top5List.innerHTML = '';
+            bottom5List.innerHTML = '';
+
+            const sortedHigh = [...enteredLocations].sort((a, b) => b.value - a.value);
+            const top5 = sortedHigh.slice(0, 5);
+            top5.forEach((loc) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center';
+                const color = getDustColorClasses(loc.value);
+                div.innerHTML = `
+                    <span class="pr-4">${loc.name}</span>
+                    <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
+                        <span class="text-2xl font-bold mr-2">${loc.value}</span>
+                        <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
+                    </div>`;
+                top5List.appendChild(div);
+            });
+
+            const sortedLow = [...enteredLocations].sort((a, b) => a.value - b.value);
+            const bottom5 = sortedLow.slice(0, 5);
+            bottom5.forEach((loc) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center';
+                const color = getDustColorClasses(loc.value);
+                div.innerHTML = `
+                    <span class="pr-4">${loc.name}</span>
+                    <div class="flex items-center justify-center ${color.bg} ${color.text} rounded-full px-3 py-0.7" style="min-width: 102px;">
+                        <span class="text-2xl font-bold mr-2">${loc.value}</span>
+                        <span class="text-xs leading-tight">มคก./<br>ลบ.ม.</span>
+                    </div>`;
+                bottom5List.appendChild(div);
+            });
+        }
+
+        function renderMapMarkers() {
+            mapMarkersContainer.innerHTML = '';
+            enteredLocations.forEach((enteredLoc) => {
+                const mapInfo = mapLocations.find((ml) => ml.name === enteredLoc.name);
+                if (mapInfo) {
+                    const label = document.createElement('div');
+                    label.className = 'map-label';
+                    label.dataset.locationId = mapInfo.id;
+                    label.textContent = `${enteredLoc.name} (${enteredLoc.value})`;
+                    const color = getDustColorClasses(enteredLoc.value);
+                    label.classList.remove('bg-white', 'text-black');
+                    label.classList.add(color.bg, color.text);
+                    mapMarkersContainer.appendChild(label);
+                }
+            });
+        }
+        
+        // ----- ส่วนที่แก้ไข: นำค่าจาก Y Offset มาใช้ในการเลื่อนตำแหน่งก่อนจับภาพ -----
+        async function capturePoster() {
+            const captureButton = document.getElementById('captureBtn');
+            const originalButtonText = captureButton.innerHTML;
+            captureButton.innerHTML = 'กำลังประมวลผล...';
+            captureButton.disabled = true;
+
+            const elementsToHide = [
+                document.getElementById('controls'),
+                captureButton,
+                ...document.querySelectorAll('.map-marker-dot')
+            ];
+            elementsToHide.forEach(el => el && el.classList.add('no-capture'));
+
+            await document.fonts.ready;
+            
+            const originalScrollY = window.scrollY;
+            
+            // อ่านค่า offset จาก input ที่ผู้ใช้กรอก
+            const yOffset = parseInt(yOffsetInput.value, 10) || 0;
+            
+            // เลื่อนหน้าจอไปที่ตำแหน่งของโปสเตอร์ + offset ที่ผู้ใช้กำหนด
+            window.scrollTo(0, posterContainer.offsetTop + yOffset);
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const options = {
+                    useCORS: true,
+                    scale: 2,
+                    backgroundColor: null,
+                };
+
+                const canvas = await html2canvas(posterContainer, options);
+                
+                const link = document.createElement('a');
+                link.download = `pm25-poster-${dateInput.value}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+            } catch (err) {
+                console.error('Oops, something went wrong!', err);
+            } finally {
+                elementsToHide.forEach(el => el && el.classList.remove('no-capture'));
+                window.scrollTo(0, originalScrollY); // เลื่อนกลับไปที่เดิม
+                captureButton.innerHTML = originalButtonText;
+                captureButton.disabled = false;
+            }
+        }
+        // -------------------------------------------------------------------
+    </script>
+</body>
+</html>
+

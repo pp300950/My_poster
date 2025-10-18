@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive PM2.5 Map Generator — improved labels</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f0f2f5;
+            display: flex; justify-content: center; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }
+        main { display: flex; gap: 20px; width: 95vw; height: 90vh; max-width: 1600px; }
+
+        #map-container {
+            flex-grow: 1; height: 100%;
+            background-image: url('My_poster.jpg');
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            position: relative; cursor: crosshair;
+            border: 2px solid #ccc; border-radius: 8px; overflow: hidden;
+        }
+
+        .marker {
+            width: 18px; height: 18px; background-color: rgba(255,0,0,0.9);
+            border: 2px solid white; border-radius: 50%; position: absolute;
+            transform: translate(-50%, -50%); box-shadow: 0 0 6px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+
+        /* SVG overlay */
+        .callout-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        .callout-label {
+            position: absolute; display: flex; align-items: center;
+            background-color: white; padding: 6px 10px; border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25); pointer-events: none; gap: 8px;
+            white-space: nowrap; transform: translateY(-50%);
+        }
+        .rank-circle {
+            width: 30px; height: 30px; background-color: #D92121; color: white;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-weight: 700; font-size: 16px; flex-shrink: 0;
+        }
+        .rank-name { font-size: 15px; font-weight: 700; color: #333; }
+
+        #sidebar { width: 350px; flex-shrink: 0; padding: 20px; background: white; border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); height: 100%; overflow-y: auto; box-sizing: border-box;
+        }
+        #positions-list { display:flex; flex-direction:column; gap:15px; margin-top:20px; }
+        .position-entry { display:flex; align-items:center; gap:10px; }
+        .position-entry label { font-weight:700; width:100px; }
+        .position-entry input { flex-grow:1; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:16px; }
+
+        .controls { margin-top: 30px; display:flex; flex-direction:column; gap:10px; }
+        button { font-family:'Sarabun'; font-size:16px; padding:12px; cursor:pointer; border:none; border-radius:5px; color:white; font-weight:700; transition: background-color 0.2s, transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        #generate-btn { background-color:#28a745; } #generate-btn:hover{ background-color:#218838; }
+        #reset-btn { background-color:#dc3545; } #reset-btn:hover{ background-color:#c82333; }
+    </style>
+</head>
+<body>
+    <main>
+        <div id="map-container"></div>
+        <div id="sidebar">
+            <h2>กำหนดจุดตรวจวัด</h2>
+            <p>คลิกบนแผนที่ด้านซ้ายเพื่อเพิ่มจุดตรวจวัดใหม่</p>
+            <div id="positions-list"></div>
+            <div class="controls">
+                <button id="generate-btn">สร้างรายงาน 5 อันดับสูงสุด</button>
+                <button id="reset-btn">รีเซ็ตทั้งหมด</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const mapContainer = document.getElementById('map-container');
+        const positionsList = document.getElementById('positions-list');
+        const generateBtn = document.getElementById('generate-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        let positions = [];
+        let positionCounter = 1;
+
+        function clearVisualizations() {
+            // Remove callout SVG if any
+            const oldSvg = mapContainer.querySelector('.callout-svg');
+            if (oldSvg) oldSvg.remove();
+            const oldLabels = mapContainer.querySelectorAll('.callout-label');
+            oldLabels.forEach(l => l.remove());
+        }
+
+        mapContainer.addEventListener('click', (event) => {
+            const rect = mapContainer.getBoundingClientRect();
+            const x = (event.clientX - rect.left);
+            const y = (event.clientY - rect.top);
+            if (x < 0 || x > rect.width || y < 0 || y > rect.height) return;
+
+            const marker = document.createElement('div');
+            marker.className = 'marker';
+            marker.style.left = `${x}px`;
+            marker.style.top = `${y}px`;
+            mapContainer.appendChild(marker);
+
+            const positionName = `จุดที่ ${positionCounter}`;
+            const entry = document.createElement('div');
+            entry.className = 'position-entry';
+            entry.innerHTML = `
+                <label for="pos-${positionCounter}">${positionName}:</label>
+                <input type="number" id="pos-${positionCounter}" placeholder="กรอกค่าฝุ่น">
+            `;
+            positionsList.appendChild(entry);
+            const inputElement = entry.querySelector('input');
+
+            positions.push({
+                id: positionCounter,
+                name: positionName,
+                x: x,
+                y: y,
+                value: 0,
+                markerElement: marker,
+                inputElement: inputElement
+            });
+            positionCounter++;
+        });
+
+        generateBtn.addEventListener('click', () => {
+            clearVisualizations();
+
+            // update values
+            positions.forEach(pos => {
+                const val = parseFloat(pos.inputElement.value);
+                pos.value = isNaN(val) ? 0 : val;
+            });
+
+            // top5
+            const top5 = [...positions].sort((a,b)=>b.value - a.value).slice(0,5).filter(p => p.value > 0);
+
+            if (top5.length === 0) return;
+
+            const mapWidth = mapContainer.clientWidth;
+            const mapHeight = mapContainer.clientHeight;
+            const midX = mapWidth / 2;
+
+            // create SVG overlay
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.classList.add('callout-svg');
+            svg.setAttribute('width', mapWidth);
+            svg.setAttribute('height', mapHeight);
+            svg.setAttribute('viewBox', `0 0 ${mapWidth} ${mapHeight}`);
+            mapContainer.appendChild(svg);
+
+            // Setup columns: labels will be placed toward nearest edge (away from center)
+            const leftColumnX = Math.max(10, mapWidth * 0.06); // px from left
+            const rightColumnX = Math.min(mapWidth - 10, mapWidth * 0.94); // px from left
+
+            const labelHeight = 40; // approx height; actual measured after creating each label, but use for stacking calc
+            const gap = 8;
+            const margin = 10;
+
+            // Split into two sides: markers on left half => labels to left edge, right half => to right edge
+            const leftSidePoints = top5.filter(p => p.x < midX).sort((a,b)=> a.y - b.y);
+            const rightSidePoints = top5.filter(p => p.x >= midX).sort((a,b)=> a.y - b.y);
+
+            // Helper: create label element and append hidden to measure width
+            function createLabelElement(rank, pos) {
+                const label = document.createElement('div');
+                label.className = 'callout-label';
+                label.style.visibility = 'hidden'; // hide while measuring
+                label.innerHTML = `<div class="rank-circle">${rank}</div><div class="rank-name">${pos.name} (${pos.value})</div>`;
+                mapContainer.appendChild(label);
+                // measure
+                const rect = label.getBoundingClientRect();
+                const w = rect.width;
+                const h = rect.height;
+                return { element: label, width: w, height: h };
+            }
+
+            // Balanced stacking: center the stacked labels around the mean of preferred Y to avoid pushing all downward
+            function layoutSide(points, isRightSide) {
+                if (points.length === 0) return [];
+
+                // preferred Y positions
+                const preferredYs = points.map(p => p.y);
+                const meanY = preferredYs.reduce((s, v) => s + v, 0) / preferredYs.length;
+
+                // initial total height
+                // we will measure label heights individually, but use an initial estimate
+                const estLabelH = labelHeight;
+                const totalH = points.length * estLabelH + (points.length - 1) * gap;
+
+                // compute startY (top of first label's center)
+                let startTop = meanY - totalH / 2;
+                startTop = Math.max(margin, Math.min(startTop, mapHeight - margin - totalH));
+
+                // create label elements to measure actual heights/widths
+                const measured = points.map((p, idx) => {
+                    const rank = top5.findIndex(t => t.id === p.id) + 1;
+                    return { pos: p, rank, ...createLabelElement(rank, p) };
+                });
+
+                // recompute totalH with actual heights
+                const actualTotalH = measured.reduce((s, m) => s + m.height, 0) + (measured.length - 1) * gap;
+                startTop = meanY - actualTotalH / 2;
+                startTop = Math.max(margin, Math.min(startTop, mapHeight - margin - actualTotalH));
+
+                // finalize positions
+                let cursor = startTop;
+                const placements = [];
+                for (let i = 0; i < measured.length; i++) {
+                    const m = measured[i];
+                    const centerY = cursor + m.height / 2;
+                    // determine label X
+                    let labelX;
+                    if (isRightSide) {
+                        // label near rightColumnX, but we must position left property = labelX - width/2 => easier: set left = columnX - width
+                        labelX = rightColumnX - m.width; // keep a margin from edge
+                        // prevent going beyond map bounds
+                        if (labelX < mapWidth * 0.5) labelX = Math.max(mapWidth * 0.5 + 10, labelX);
+                    } else {
+                        // left side: place label so its left is near leftColumnX
+                        labelX = leftColumnX; // left coordinate
+                        if (labelX + m.width > mapWidth * 0.5) labelX = Math.min(mapWidth * 0.5 - m.width - 10, labelX);
+                    }
+
+                    // position HTML element
+                    m.element.style.left = `${labelX}px`;
+                    m.element.style.top = `${centerY}px`;
+                    m.element.style.visibility = 'visible';
+
+                    placements.push({
+                        pos: m.pos,
+                        rank: m.rank,
+                        labelElement: m.element,
+                        labelX: labelX,
+                        labelY: centerY,
+                        labelW: m.width,
+                        labelH: m.height
+                    });
+
+                    cursor += m.height + gap;
+                }
+
+                return placements;
+            }
+
+            // Draw connectors (curved polyline) from marker center to label anchor
+            function drawConnector(placement, isRightSide) {
+                const startX = placement.pos.x;
+                const startY = placement.pos.y;
+                // choose anchorX on label side (a little inset from label box)
+                const anchorX = isRightSide ? (placement.labelX) : (placement.labelX + placement.labelW);
+                const anchorY = placement.labelY;
+                // Create a path with two segments: horizontal from startX to midX, then curve to anchor
+                const midX = isRightSide ? Math.max(startX + 20, anchorX - 20) : Math.min(startX - 20, anchorX + 20);
+
+                // Build a simple path with a cubic bezier for nicer look
+                const path = document.createElementNS(svgNS, 'path');
+                const cpOffset = Math.abs(anchorX - startX) * 0.25 + 10; // control point offset
+                const cp1x = startX + (isRightSide ? cpOffset : -cpOffset);
+                const cp1y = startY;
+                const cp2x = anchorX + (isRightSide ? -cpOffset : cpOffset);
+                const cp2y = anchorY;
+
+                const d = `M ${startX} ${startY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${anchorX} ${anchorY}`;
+                path.setAttribute('d', d);
+                path.setAttribute('stroke', '#D92121');
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke-linecap', 'round');
+                svg.appendChild(path);
+
+                // small circle at label anchor (optional) — keep subtle
+                const circ = document.createElementNS(svgNS, 'circle');
+                circ.setAttribute('cx', anchorX);
+                circ.setAttribute('cy', anchorY);
+                circ.setAttribute('r', '2');
+                circ.setAttribute('fill', '#D92121');
+                svg.appendChild(circ);
+            }
+
+            // Layout both sides and draw
+            const leftPlacements = layoutSide(leftSidePoints, false);
+            const rightPlacements = layoutSide(rightSidePoints, true);
+
+            leftPlacements.forEach(p => drawConnector(p, false));
+            rightPlacements.forEach(p => drawConnector(p, true));
+        });
+
+        resetBtn.addEventListener('click', () => {
+            clearVisualizations();
+            const allMarkers = document.querySelectorAll('.marker');
+            allMarkers.forEach(m => m.remove());
+            positionsList.innerHTML = '';
+            positions = [];
+            positionCounter = 1;
+        });
+    </script>
+</body>
+</html>

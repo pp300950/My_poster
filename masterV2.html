@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>สรุปสถานการณ์ฝุ่น PM2.5 ม.บูรพา</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      body {
+        font-family: 'Sarabun', sans-serif;
+        background-color: #555;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      main {
+        display: flex;
+        gap: 20px;
+        width: 95vw;
+        height: 90vh;
+        max-width: 1600px;
+      }
+
+      #map-container {
+        flex-grow: 1;
+        position: relative;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .poster {
+        width: 100%;
+        height: 100%;
+        background-image: url('My_poster.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        position: relative;
+        cursor: crosshair;
+      }
+
+      .marker {
+        width: 18px;
+        height: 18px;
+        background-color: rgba(255, 0, 0, 0.9);
+        border: 2px solid white;
+        border-radius: 50%;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+        pointer-events: none;
+      }
+
+      .callout-svg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .callout-label {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        background-color: white;
+        padding: 6px 10px;
+        border-radius: 20px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+        pointer-events: none;
+        gap: 8px;
+        white-space: nowrap;
+        transform: translateY(-50%);
+      }
+      .rank-circle {
+        width: 30px;
+        height: 30px;
+        background-color: #d92121;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .rank-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #333;
+      }
+
+      #sidebar {
+        width: 350px;
+        flex-shrink: 0;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        height: 100%;
+        overflow-y: auto;
+        box-sizing: border-box;
+      }
+
+      #positions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 20px;
+      }
+      .position-entry {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+      }
+      .position-entry label {
+        font-weight: 700;
+      }
+      .position-entry input {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 15px;
+      }
+
+      .controls {
+        margin-top: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      button {
+        font-family: 'Sarabun';
+        font-size: 16px;
+        padding: 12px;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        font-weight: 700;
+        transition: background-color 0.2s, transform 0.1s;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+      #generate-btn {
+        background-color: #28a745;
+      }
+      #generate-btn:hover {
+        background-color: #218838;
+      }
+      #reset-btn {
+        background-color: #dc3545;
+      }
+      #reset-btn:hover {
+        background-color: #c82333;
+      }
+      #downloadBtn {
+        background-color: #007bff;
+      }
+      #downloadBtn:hover {
+        background-color: #0069d9;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div id="map-container">
+        <div class="poster" id="poster">
+          <svg class="callout-svg"></svg>
+        </div>
+      </div>
+
+      <div id="sidebar">
+        <h2>กำหนดจุดตรวจวัด</h2>
+        <p>คลิกบนโปสเตอร์ด้านซ้ายเพื่อเพิ่มจุดตรวจวัด</p>
+        <div id="positions-list"></div>
+        <div class="controls">
+          <button id="generate-btn">สร้างรายงาน 5 อันดับสูงสุด</button>
+          <button id="reset-btn">รีเซ็ตทั้งหมด</button>
+          <button id="downloadBtn">ดาวน์โหลดโปสเตอร์เป็นภาพ</button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const poster = document.getElementById("poster");
+      const positionsList = document.getElementById("positions-list");
+      const generateBtn = document.getElementById("generate-btn");
+      const resetBtn = document.getElementById("reset-btn");
+      const downloadBtn = document.getElementById("downloadBtn");
+
+      let positions = [];
+      let positionCounter = 1;
+
+      poster.addEventListener("click", (event) => {
+        const rect = poster.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        const marker = document.createElement("div");
+        marker.className = "marker";
+        marker.style.left = `${x}px`;
+        marker.style.top = `${y}px`;
+        poster.appendChild(marker);
+
+        const entry = document.createElement("div");
+        entry.className = "position-entry";
+        entry.innerHTML = `
+          <label>Position ${positionCounter}</label>
+          <input type="text" placeholder="ชื่อจุดตรวจ (เช่น หอพักเทาทอง)">
+          <input type="number" placeholder="ค่าฝุ่น (µg/m³)">
+        `;
+        positionsList.appendChild(entry);
+
+        const [nameInput, valueInput] = entry.querySelectorAll("input");
+
+        positions.push({
+          id: positionCounter,
+          x,
+          y,
+          nameInput,
+          valueInput,
+          marker,
+        });
+
+        positionCounter++;
+      });
+
+      function clearVisualizations() {
+        poster.querySelectorAll(".callout-label").forEach((el) => el.remove());
+        poster.querySelector("svg").innerHTML = "";
+      }
+
+      generateBtn.addEventListener("click", () => {
+        clearVisualizations();
+        const top5 = [...positions]
+          .map((p) => ({
+            ...p,
+            name: p.nameInput.value || `Position ${p.id}`,
+            value: parseFloat(p.valueInput.value) || 0,
+          }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5)
+          .filter((p) => p.value > 0);
+
+        const svg = poster.querySelector("svg");
+        const svgNS = "http://www.w3.org/2000/svg";
+
+        const mapWidth = poster.clientWidth;
+        const midX = mapWidth / 2;
+
+        top5.forEach((pos, i) => {
+          const label = document.createElement("div");
+          label.className = "callout-label";
+          label.innerHTML = `
+            <div class="rank-circle">${i + 1}</div>
+            <div class="rank-name">${pos.name} (${pos.value})</div>
+          `;
+          poster.appendChild(label);
+
+          const labelRect = label.getBoundingClientRect();
+          const labelWidth = labelRect.width;
+          const labelHeight = labelRect.height;
+
+          const isRightSide = pos.x > midX;
+          const labelX = isRightSide
+            ? mapWidth - labelWidth - 40
+            : 40;
+          const labelY = pos.y;
+
+          label.style.left = `${labelX}px`;
+          label.style.top = `${labelY}px`;
+
+          const path = document.createElementNS(svgNS, "path");
+          const cpOffset = Math.abs(labelX - pos.x) * 0.25 + 10;
+          const cp1x = pos.x + (isRightSide ? cpOffset : -cpOffset);
+          const cp1y = pos.y;
+          const cp2x = labelX + (isRightSide ? -cpOffset : cpOffset);
+          const cp2y = labelY;
+          const d = `M ${pos.x} ${pos.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${labelX} ${labelY}`;
+          path.setAttribute("d", d);
+          path.setAttribute("stroke", "#D92121");
+          path.setAttribute("stroke-width", "2");
+          path.setAttribute("fill", "none");
+          svg.appendChild(path);
+        });
+      });
+
+      resetBtn.addEventListener("click", () => {
+        clearVisualizations();
+        positions.forEach((p) => p.marker.remove());
+        positionsList.innerHTML = "";
+        positions = [];
+        positionCounter = 1;
+      });
+
+      downloadBtn.addEventListener("click", () => {
+        html2canvas(poster, { useCORS: true, scale: 2 }).then((canvas) => {
+          const link = document.createElement("a");
+          link.download = "PM25_Report.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+      });
+    </script>
+  </body>
+</html>

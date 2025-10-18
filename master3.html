@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>สรุปสถานการณ์ฝุ่น PM2.5 ม.บูรพา</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      :root {
+        --sidebar-width: 360px;
+      }
+      body {
+        font-family: 'Sarabun', sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 14px;
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+      }
+
+      main {
+        display: flex;
+        gap: 18px;
+        width: 100%;
+        max-width: 1400px;
+        align-items: stretch;
+      }
+
+      /* Left: poster area */
+      #map-container {
+        flex: 1;
+        position: relative;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        background: #000;
+        overflow: hidden;
+        min-height: 600px;
+      }
+
+      /* Poster viewport is scrollable when image is tall */
+      #poster {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: auto; /* allows vertical/horizontal scroll when image large */
+        background: #111;
+      }
+
+      /* actual image - responsive */
+      #poster-img {
+        display: block;
+        width: 100%;
+        height: auto;
+        user-select: none;
+        -webkit-user-drag: none;
+        pointer-events: auto; /* let clicks be caught */
+      }
+
+      /* overlay SVG and markers/labels live on top of image */
+      .overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        pointer-events: none; /* allow clicks to pass to image */
+      }
+
+      .marker {
+        width: 18px;
+        height: 18px;
+        background-color: rgba(255, 0, 0, 0.95);
+        border: 2px solid white;
+        border-radius: 50%;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+        pointer-events: none;
+      }
+
+      .callout-label {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        background-color: white;
+        padding: 6px 10px;
+        border-radius: 20px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        pointer-events: auto;
+        gap: 8px;
+        white-space: nowrap;
+        transform: translateY(-50%);
+      }
+      .rank-circle {
+        width: 34px;
+        height: 34px;
+        background-color: #d92121;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: 800;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .rank-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #333;
+      }
+
+      /* sidebar */
+      #sidebar {
+        width: var(--sidebar-width);
+        flex-shrink: 0;
+        padding: 18px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        height: 80vh;
+        box-sizing: border-box;
+        overflow-y: auto;
+      }
+
+      #sidebar h2 {
+        margin: 0;
+      }
+      #sidebar p {
+        margin: 6px 0 12px 0;
+        color: #555;
+      }
+
+      #positions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .position-entry {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: #fafafa;
+        align-items: center;
+        border: 1px solid #eee;
+      }
+      .position-entry .info {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .position-entry label {
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .position-entry input[type="text"],
+      .position-entry input[type="number"] {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .position-entry .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .small-btn {
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .del-btn { background: #dc3545; color: #fff; }
+      .focus-btn { background: #007bff; color: #fff; }
+
+      .controls {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .controls button {
+        font-family: 'Sarabun';
+        font-size: 15px;
+        padding: 12px;
+        cursor: pointer;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-weight: 700;
+        transition: background-color 0.15s, transform 0.06s;
+      }
+      .controls button:active { transform: scale(0.99); }
+
+      #generate-btn { background-color: #d92121; }
+      #reset-btn { background-color: #6c757d; }
+      #downloadBtn { background-color: #007bff; }
+
+      /* date badge on poster (absolute inside poster content) */
+      .date-badge {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        background: rgba(255,255,255,0.95);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        z-index: 20;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div id="map-container">
+        <div id="poster">
+          <!-- date shown on top-left of poster -->
+          <div class="date-badge" id="dateBadge">ประจำวันที่ —</div>
+
+          <!-- the image that can be tall; user should replace src -->
+          <img id="poster-img" src="My_poster.jpg" alt="Poster image" />
+
+          <!-- SVG overlay (will match image displayed size and position) -->
+          <svg id="overlay-svg" class="overlay"></svg>
+        </div>
+      </div>
+
+      <div id="sidebar">
+        <h2>กำหนดจุดตรวจวัด</h2>
+        <p>คลิกบนโปสเตอร์ด้านซ้ายเพื่อเพิ่มจุดตรวจวัด (เก็บตำแหน่งไว้เป็นเปอร์เซนต์)</p>
+
+        <div style="font-size:13px;color:#444;margin-bottom:8px;">
+          จำนวนจุดที่เพิ่ม: <span id="countDisplay">0</span>
+        </div>
+
+        <div id="positions-list"></div>
+
+        <div class="controls">
+          <button id="generate-btn">สร้างรายงาน 5 อันดับสูงสุด</button>
+          <button id="reset-btn">รีเซ็ตทั้งหมด</button>
+          <button id="downloadBtn">ดาวน์โหลดโปสเตอร์เป็นภาพ</button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+
+      const defaultPositions = [
+  { id: 1, name: "หอสมุด", percentX: 32.1, percentY: 45.8 },
+  { id: 2, name: "หอพักเทาทอง 4", percentX: 41.2, percentY: 52.7 },
+  // ...
+];
+
+
+      // --- Elements ---
+      const poster = document.getElementById("poster");
+      const posterImg = document.getElementById("poster-img");
+      const overlaySvg = document.getElementById("overlay-svg");
+      const positionsList = document.getElementById("positions-list");
+      const generateBtn = document.getElementById("generate-btn");
+      const resetBtn = document.getElementById("reset-btn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const dateBadge = document.getElementById("dateBadge");
+      const countDisplay = document.getElementById("countDisplay");
+
+      // --- Data model ---
+      // store positions as percentage coordinates so resize/scroll safe
+      let positions = [];
+      let nextId = 1;
+
+      // --- set today's date (Thai format, Buddhist year) ---
+      function formatThaiDate(d) {
+        const monthsThai = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+        const day = d.getDate();
+        const month = monthsThai[d.getMonth()];
+        const yearBE = d.getFullYear() + 543;
+        return `ประจำวันที่ ${day} ${month} ${yearBE}`;
+      }
+      dateBadge.textContent = formatThaiDate(new Date());
+
+      // --- helper: get displayed image position and sizes relative to poster viewport ---
+      function getImageRect() {
+        // get bounding box of image relative to poster element (client coordinates including scroll)
+        const imgRect = posterImg.getBoundingClientRect();
+        const posterRect = poster.getBoundingClientRect();
+        // image offset inside poster content (in pixels)
+        const offsetLeft = imgRect.left - posterRect.left + poster.scrollLeft;
+        const offsetTop = imgRect.top - posterRect.top + poster.scrollTop;
+        return {
+          left: offsetLeft,
+          top: offsetTop,
+          width: posterImg.clientWidth,
+          height: posterImg.clientHeight,
+        };
+      }
+
+      // --- click on image to add position ---
+      posterImg.addEventListener("click", (ev) => {
+        // compute coordinates relative to the displayed image element
+        const imgRect = posterImg.getBoundingClientRect();
+        const clickX = ev.clientX - imgRect.left;
+        const clickY = ev.clientY - imgRect.top;
+        if (clickX < 0 || clickY < 0 || clickX > imgRect.width || clickY > imgRect.height) return;
+
+        // store as percentage
+        const px = (clickX / imgRect.width) * 100;
+        const py = (clickY / imgRect.height) * 100;
+
+        const id = nextId++;
+        const entry = {
+          id,
+          percentX: px,
+          percentY: py,
+          name: `Position ${id}`,
+          value: 0,
+        };
+        positions.push(entry);
+        appendPositionEntry(entry);
+        countDisplay.textContent = positions.length;
+        renderMarkers(); // show small marker on map
+      });
+
+      // --- append entry row in sidebar ---
+      function appendPositionEntry(pos) {
+        const container = document.createElement("div");
+        container.className = "position-entry";
+        container.dataset.id = pos.id;
+        container.innerHTML = `
+          <div class="info">
+            <label>จุดที่ ${pos.id}</label>
+            <input type="text" class="name-input" placeholder="ชื่อจุดตรวจ (เช่น หอพักเทาทอง)" value="${pos.name}" />
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <input type="number" class="value-input" placeholder="ค่าฝุ่น (µg/m³)" min="0" style="flex:1" value="${pos.value}" />
+              <input type="text" class="coord-display" readonly style="width:120px;background:#fff;border:0;color:#666;font-size:13px;" />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="small-btn focus-btn">ไปยังจุด</button>
+            <button class="small-btn del-btn">ลบ</button>
+          </div>
+        `;
+        positionsList.appendChild(container);
+
+        // set coords display
+        const coordDisplay = container.querySelector(".coord-display");
+        coordDisplay.value = `${pos.percentX.toFixed(1)}% , ${pos.percentY.toFixed(1)}%`;
+
+        // wiring inputs
+        const nameInput = container.querySelector(".name-input");
+        const valueInput = container.querySelector(".value-input");
+        nameInput.addEventListener("input", (e) => {
+          pos.name = e.target.value;
+        });
+        valueInput.addEventListener("input", (e) => {
+          pos.value = parseFloat(e.target.value) || 0;
+        });
+
+        // focus button: scroll poster to show point
+        container.querySelector(".focus-btn").addEventListener("click", () => {
+          focusOnPosition(pos);
+        });
+
+        // delete
+        container.querySelector(".del-btn").addEventListener("click", () => {
+          // remove from positions array
+          positions = positions.filter((p) => p.id !== pos.id);
+          container.remove();
+          countDisplay.textContent = positions.length;
+          renderMarkers();
+          clearVisualizations(); // remove labels if any
+        });
+      }
+
+      // --- position to pixel (on displayed image) ---
+      function percentToPixels(pos) {
+        // returns {x, y} relative to poster content (including scroll)
+        const imgRect = posterImg.getBoundingClientRect();
+        const posterRect = poster.getBoundingClientRect();
+        const displayedWidth = posterImg.clientWidth;
+        const displayedHeight = posterImg.clientHeight;
+
+        const xInImg = (pos.percentX / 100) * displayedWidth;
+        const yInImg = (pos.percentY / 100) * displayedHeight;
+
+        // position relative to poster content (consider image offset inside poster scroll)
+        // calculate offset of image within poster content (left/top)
+        const imgOffset = getImageRect();
+        const x = imgOffset.left + xInImg;
+        const y = imgOffset.top + yInImg;
+        return { x, y, displayedWidth, displayedHeight, imgLeft: imgOffset.left, imgTop: imgOffset.top };
+      }
+
+      // --- render small markers for all positions (used for editing) ---
+      function renderMarkers() {
+        // remove old small markers (but keep callout labels separately)
+        const old = poster.querySelectorAll(".marker");
+        old.forEach((o) => o.remove());
+
+        positions.forEach((p) => {
+          const px = percentToPixels(p);
+          const marker = document.createElement("div");
+          marker.className = "marker";
+          marker.style.left = `${px.x}px`;
+          marker.style.top = `${px.y}px`;
+          marker.style.zIndex = 10;
+          poster.appendChild(marker);
+        });
+
+        // update overlay SVG size & position to match current image displayed region
+        updateOverlaySize();
+      }
+
+      // --- focus: scroll poster so this position visible near center ---
+      function focusOnPosition(pos) {
+        const imgRect = posterImg.getBoundingClientRect();
+        const displayedWidth = posterImg.clientWidth;
+        const displayedHeight = posterImg.clientHeight;
+        const xInImg = (pos.percentX / 100) * displayedWidth;
+        const yInImg = (pos.percentY / 100) * displayedHeight;
+        // scroll so that point is centered (if possible)
+        const targetScrollLeft = Math.max(0, xInImg + getImageRect().left - poster.clientWidth / 2);
+        const targetScrollTop = Math.max(0, yInImg + getImageRect().top - poster.clientHeight / 2);
+        poster.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: "smooth" });
+      }
+
+      // --- clear any visualization (labels + svg paths) ---
+      function clearVisualizations() {
+        // remove callout labels
+        poster.querySelectorAll(".callout-label").forEach((el) => el.remove());
+        // clear svg
+        overlaySvg.innerHTML = "";
+      }
+
+      // --- update overlay svg to match image displayed size & position ---
+      function updateOverlaySize() {
+        const imgOff = getImageRect();
+        overlaySvg.style.left = `${imgOff.left}px`;
+        overlaySvg.style.top = `${imgOff.top}px`;
+        overlaySvg.style.width = `${imgOff.width}px`;
+        overlaySvg.style.height = `${imgOff.height}px`;
+        overlaySvg.setAttribute("width", imgOff.width);
+        overlaySvg.setAttribute("height", imgOff.height);
+        overlaySvg.setAttribute("viewBox", `0 0 ${imgOff.width} ${imgOff.height}`);
+      }
+
+      // --- render 5 top labels and connecting curves ---
+      function renderTop5() {
+        clearVisualizations();
+        if (positions.length === 0) return;
+
+        // compute name & value (ensures numbers)
+        const computed = positions.map((p) => ({
+          ...p,
+          name: p.name || `Position ${p.id}`,
+          value: parseFloat(p.value) || 0,
+        }));
+
+        // sort by value desc and pick top 5 with value > 0
+        const top5 = computed
+          .filter((p) => p.value > 0)
+          .sort((a,b) => b.value - a.value)
+          .slice(0,5);
+
+        if (top5.length === 0) return;
+
+        // prepare overlay
+        updateOverlaySize();
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const overlayRect = overlaySvg.getBoundingClientRect();
+        const imgOff = getImageRect();
+        const mapWidth = imgOff.width;
+        const midX = mapWidth / 2;
+
+        top5.forEach((pos, idx) => {
+          const pixel = percentToPixels(pos);
+
+          // create label element
+          const label = document.createElement("div");
+          label.className = "callout-label";
+          label.style.zIndex = 50;
+          label.innerHTML = `
+            <div class="rank-circle">${idx + 1}</div>
+            <div class="rank-name">${pos.name} (${pos.value})</div>
+          `;
+          poster.appendChild(label);
+
+          // temporarily position offscreen to measure
+          label.style.left = `0px`;
+          label.style.top = `0px`;
+          label.style.opacity = "0";
+          // allow browser to render so getBoundingClientRect works
+          // compute label size
+          const labelRect = label.getBoundingClientRect();
+          const labelWidth = labelRect.width;
+          const labelHeight = labelRect.height;
+
+          // decide side based on point x (relative to image left)
+          const imgLeft = imgOff.left;
+          const pointXInImage = (pos.percentX / 100) * imgOff.width;
+          const isRightSide = pointXInImage > midX;
+
+          // target label anchor X inside image coordinates (relative to overlay)
+          const padding = 18;
+          let labelXInOverlay = isRightSide ? imgOff.width - labelWidth - padding : padding;
+          // label y in overlay coords
+          let labelYInOverlay = (pos.percentY / 100) * imgOff.height;
+
+          // set final absolute position (convert overlay coords to poster content coords)
+          const finalLeft = imgOff.left + labelXInOverlay;
+          const finalTop = imgOff.top + labelYInOverlay;
+
+          label.style.left = `${finalLeft}px`;
+          label.style.top = `${finalTop}px`;
+          label.style.opacity = "1";
+
+          // draw path from point -> label (map coords)
+          // convert point (pixel.x, pixel.y) to coordinates inside overlay (subtract imgOff.left/top)
+          const startX = (pos.percentX / 100) * imgOff.width;
+          const startY = (pos.percentY / 100) * imgOff.height;
+          // end point inside overlay: labelXInOverlay, labelYInOverlay (we'll anchor to label center-left or center-right)
+          // choose end anchor point on label: if left side, anchor to left edge + labelWidth? We'll anchor to label inner point
+          const endX = isRightSide ? labelXInOverlay + labelWidth : labelXInOverlay;
+          const endY = labelYInOverlay;
+
+          // Bezier control points
+          const cpOffset = Math.max(40, Math.abs(endX - startX) * 0.4);
+          const cp1x = startX + (isRightSide ? cpOffset : -cpOffset);
+          const cp1y = startY;
+          const cp2x = endX + (isRightSide ? -cpOffset : cpOffset);
+          const cp2y = endY;
+
+          const path = document.createElementNS(svgNS, "path");
+          const d = `M ${startX} ${startY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${endX} ${endY}`;
+          path.setAttribute("d", d);
+          path.setAttribute("stroke", "#D92121");
+          path.setAttribute("stroke-width", "3");
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          path.style.pointerEvents = "none";
+          overlaySvg.appendChild(path);
+        });
+      }
+
+      // --- event handlers ---
+      generateBtn.addEventListener("click", () => {
+        renderTop5();
+      });
+
+      resetBtn.addEventListener("click", () => {
+        // remove positions data & UI
+        positions = [];
+        positionsList.innerHTML = "";
+        poster.querySelectorAll(".marker").forEach(m => m.remove());
+        clearVisualizations();
+        nextId = 1;
+        countDisplay.textContent = 0;
+      });
+
+      // on resize or scroll we need to reposition markers and overlays
+      window.addEventListener("resize", () => {
+        renderMarkers();
+        // if labels exist, re-render them to adjust positions
+        // easiest: re-render top5 if any
+        if (overlaySvg.children.length > 0) {
+          renderTop5();
+        }
+      });
+      poster.addEventListener("scroll", () => {
+        // when scrolling, markers are absolutely positioned relative to poster content so remain OK.
+        // need to update overlay position (overlay is positioned with left/top in content coords)
+        updateOverlaySize();
+        if (overlaySvg.children.length > 0) renderTop5();
+      });
+
+      // --- ensure overlay initial size once image loaded ---
+      posterImg.addEventListener("load", () => {
+        updateOverlaySize();
+        renderMarkers();
+      });
+
+      // in case image already cached loaded
+      if (posterImg.complete) {
+        setTimeout(() => {
+          updateOverlaySize();
+          renderMarkers();
+        }, 50);
+      }
+
+      // --- download screenshot of poster area (with labels visible) ---
+      downloadBtn.addEventListener("click", () => {
+        // use html2canvas on poster (this captures visible area inside poster - if you'd like full image include scroll top management)
+        // Option: scroll to top then render full image. For now capture current visible poster viewport including overlays.
+        html2canvas(poster, { useCORS: true, scale: 2 }).then((canvas) => {
+          const link = document.createElement("a");
+          link.download = "PM25_Report.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        }).catch((err) => {
+          alert("ไม่สามารถดาวน์โหลดได้: " + err);
+        });
+      });
+
+      // --- initial small helper: keyboard H to show help ---
+      document.addEventListener("keydown", (e) => {
+        if (e.key.toLowerCase() === "h") {
+          alert("วิธีใช้:\n1) คลิกบนภาพเพื่อเพิ่มจุด\n2) ใส่ชื่อและค่าฝุ่นที่ด้านขวา\n3) กด 'สร้างรายงาน 5 อันดับสูงสุด'\n4) ปรับตำแหน่ง/ลบจุดได้จากแถบขวา");
+        }
+      });
+    </script>
+  </body>
+</html>
