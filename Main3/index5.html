@@ -6,16 +6,18 @@
     <title>ระบบสร้างโปสเตอร์ PM2.5 อัตโนมัติ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Condensed:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap"
+  rel="stylesheet"
+/>
+
+   
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
-      body {
-        font-family: 'Sarabun', sans-serif;
-      }
+     body {
+  font-family: 'Tahoma', sans-serif;
+}
       .no-capture {
         display: none !important;
       }
@@ -437,15 +439,15 @@
 
       function getDustColorClasses(value) {
         if (value <= 15.0) {
-          return { bg: 'bg-cyan-500', text: 'text-white' }; // ฟ้า
+          return { bg: 'bg-[#33cbf5]', text: 'text-white' }; // ฟ้า
         } else if (value <= 25.0) {
-          return { bg: 'bg-green-500', text: 'text-white' }; // เขียว
+          return { bg: 'bg-[#33b773]', text: 'text-white' }; // เขียว
         } else if (value <= 37.5) {
-          return { bg: 'bg-yellow-500', text: 'text-white' }; // เหลือง
+          return { bg: 'bg-[#f4834e]', text: 'text-white' }; // เหลือง
         } else if (value <= 75.0) {
-          return { bg: 'bg-orange-500', text: 'text-white' }; // ส้ม
+          return { bg: 'bg-[#fdcc71]', text: 'text-white' }; // ส้ม
         } else {
-          return { bg: 'bg-red-600', text: 'text-white' }; // แดง
+          return { bg: 'bg-[#ed1c24]', text: 'text-white' }; // แดง
         }
       }
 
@@ -600,6 +602,7 @@
           captureButton.disabled = false;
         }
       }
+
     </script>
   </body>
 </html>
