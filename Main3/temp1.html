@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>เครื่องมือปรับตำแหน่ง Label บนแผนที่</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+
+        /* === CSS จากโค้ดเดิม (สำหรับการแสดงผล Marker) === */
+        .map-marker-container {
+            position: absolute;
+            transform: translate(-50%, -50%);
+        }
+        .map-marker-dot {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            border: 2px solid white;
+            transform: translate(-50%, -50%);
+            z-index: 99;
+        }
+        .leader-line-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            overflow: visible;
+            z-index: 9;
+        }
+        .leader-line-svg line {
+            stroke: #333;
+            stroke-width: 1.5;
+        }
+        .map-label-content {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            z-index: 999;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: move; /* ทำให้รู้ว่าลากได้ */
+        }
+        .map-label-number {
+             width: 16px;
+             height: 16px;
+             border-radius: 50%;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             font-weight: bold;
+             font-size: 10px;
+             margin-right: 4px;
+             border: 1px solid rgba(0,0,0,0.2);
+             background-color: #f4834e; /* สีส้มเพื่อให้เห็นชัด */
+             color: white;
+        }
+
+        /* === ตำแหน่งจุดบนแผนที่ (จากโค้ดเดิม) === */
+        [data-location-id='location-1'] { top: 24.25%; left: 31.75%; }
+        [data-location-id='location-2'] { top: 20%; left: 37%; }
+        [data-location-id='location-3'] { top: 11%; left: 31%; }
+        [data-location-id='location-4'] { top: 27.5%; left: 12%; }
+        [data-location-id='location-5'] { top: 16%; left: 9%; }
+        [data-location-id='location-6'] { top: 33%; left: 22.65%; }
+        [data-location-id='location-7'] { top: 34%; left: 43%; }
+        [data-location-id='location-8'] { top: 42.5%; left: 20%; }
+        [data-location-id='location-9'] { top: 51%; left: 24.5%; }
+        [data-location-id='location-10'] { top: 65.5%; left: 45%; }
+        [data-location-id='location-11'] { top: 56.5%; left: 39.5%; }
+        [data-location-id='location-12'] { top: 80.2%; left: 53.2%; }
+        [data-location-id='location-13'] { top: 70.6%; left: 47.1%; }
+        [data-location-id='location-14'] { top: 63%; left: 48%; }
+        [data-location-id='location-15'] { top: 51%; left: 46.3%; }
+        [data-location-id='location-16'] { top: 46%; left: 44.5%; }
+        [data-location-id='location-17'] { top: 43.6%; left: 42.6%; }
+        [data-location-id='location-18'] { top: 42%; left: 37%; }
+        [data-location-id='location-19'] { top: 35%; left: 35.8%; }
+        [data-location-id='location-20'] { top: 46%; left: 34.8%; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-screen-2xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">เครื่องมือปรับตำแหน่ง Label บนแผนที่ 🗺️</h1>
+        <p class="mb-4 text-gray-600">
+            ปรับค่า x, y ในตารางด้านซ้าย หรือ **คลิกแล้วลาก** ป้ายบนแผนที่ได้โดยตรง |
+            เมื่อพอใจแล้ว กดปุ่ม "คัดลอกโค้ด" เพื่อนำไปวางในโปรเจกต์หลัก
+        </p>
+
+        <div class="flex flex-col md:flex-row gap-6">
+            <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow-md overflow-auto" style="max-height: 1131px;">
+                <h2 class="text-lg font-semibold mb-3">ตำแหน่งทั้งหมด</h2>
+                <div id="controls-panel" class="space-y-3">
+                    </div>
+            </div>
+
+            <div class="flex-shrink-0">
+                <div id="posterContainer" class="relative shadow-lg" style="width: 800px; height: 1131px; background-size: cover; background-position: center; background-image: url('template.jpg');">
+                    <div id="map-markers"></div>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow-md">
+                 <h2 class="text-lg font-semibold mb-2">โค้ดสำหรับนำไปใช้ 📋</h2>
+                 <button id="copy-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors mb-2">
+                    คัดลอกโค้ด
+                 </button>
+                 <pre class="bg-gray-800 text-white p-3 rounded-md text-sm overflow-auto" style="max-height: 1000px;"><code id="code-output"></code></pre>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const mapLocations = [
+        { id: 'location-1', name: 'สำนักงานอธิการบดี' },
+        { id: 'location-2', name: 'อาคาร KB' },
+        { id: 'location-3', name: 'ป้ายรถหน้ามหาวิทยาลัย' },
+        { id: 'location-4', name: 'คณะสหเวชศาสตร์' },
+        { id: 'location-5', name: 'หอพักนิสิตแพทย์' },
+        { id: 'location-6', name: 'หอพักนานาชาติ' },
+        { id: 'location-7', name: 'สำนักหอสมุด' },
+        { id: 'location-8', name: 'โรงเรียนสาธิตฯ' },
+        { id: 'location-9', name: 'โรงเรียนสาธิตฯ อินเตอร์' },
+        { id: 'location-10', name: 'คณะบริหาร' },
+        { id: 'location-11', name: 'สระว่ายน้ำ' },
+        { id: 'location-12', name: 'อาคารที่พักบุคลากร' },
+        { id: 'location-13', name: 'อาคารพักอาศัยเสนาะ' },
+        { id: 'location-14', name: 'หอพักเทาทอง 4' },
+        { id: 'location-15', name: 'หอพักเทาทอง 2' },
+        { id: 'location-16', name: 'โรงอาหารโภชนาคาร' },
+        { id: 'location-17', name: 'ลานเกือกม้า' },
+        { id: 'location-18', name: 'ป้ายรถกองกิจ' },
+        { id: 'location-19', name: 'สำนักบริการวิชาการ' },
+        { id: 'location-20', name: 'คณะมนุษย์ฯ' },
+    ];
+
+    const DEFAULT_OFFSET = { x: 15, y: -25 };
+
+    // --- State ---
+    // ใส่ค่าเริ่มต้นที่คุณมีอยู่แล้วที่นี่
+    let labelOffsets = {
+        'location-5': { x: -30, y: -45 },
+        'location-4': { x: -40, y: 30 },
+        'location-3': { x: 0,   y: -30 },
+        'location-2': { x: 40,  y: -40 },
+        'location-1': { x: 50,  y: 30 },
+    };
+    
+    // --- DOM Elements ---
+    const controlsPanel = document.getElementById('controls-panel');
+    const mapMarkersContainer = document.getElementById('map-markers');
+    const codeOutput = document.getElementById('code-output');
+    const copyBtn = document.getElementById('copy-btn');
+
+    // --- Initialization ---
+    function initialize() {
+        generateControls();
+        renderAllMarkers();
+        updateCodeOutput();
+
+        copyBtn.addEventListener('click', copyCodeToClipboard);
+    }
+
+    // --- Functions ---
+    function generateControls() {
+        controlsPanel.innerHTML = '';
+        mapLocations.forEach(loc => {
+            const offset = labelOffsets[loc.id] || DEFAULT_OFFSET; // Default
+            const controlDiv = document.createElement('div');
+            controlDiv.className = 'p-2 border rounded-md';
+            controlDiv.innerHTML = `
+                <label class="font-semibold text-sm">${loc.name}</label>
+                <div class="flex gap-2 mt-1">
+                    <label class="flex-1">X: 
+                        <input type="number" data-id="${loc.id}" data-axis="x" value="${offset.x}" class="w-full p-1 border rounded-md">
+                    </label>
+                    <label class="flex-1">Y: 
+                        <input type="number" data-id="${loc.id}" data-axis="y" value="${offset.y}" class="w-full p-1 border rounded-md">
+                    </label>
+                </div>
+            `;
+            controlsPanel.appendChild(controlDiv);
+        });
+        
+        // Add event listener after creating all inputs
+        controlsPanel.addEventListener('input', handleInputChange);
+    }
+    
+    function handleInputChange(e) {
+        if (e.target.tagName === 'INPUT') {
+            const id = e.target.dataset.id;
+            const axis = e.target.dataset.axis;
+            const value = parseInt(e.target.value, 10) || 0;
+            
+            if (!labelOffsets[id]) {
+                 labelOffsets[id] = { x: 0, y: 0 };
+            }
+            labelOffsets[id][axis] = value;
+            
+            renderAllMarkers();
+            updateCodeOutput();
+        }
+    }
+
+    function renderAllMarkers() {
+        mapMarkersContainer.innerHTML = '';
+        mapLocations.forEach((mapInfo, index) => {
+            const container = document.createElement('div');
+            container.className = 'map-marker-container';
+            container.dataset.locationId = mapInfo.id;
+
+            const dot = document.createElement('div');
+            dot.className = 'map-marker-dot';
+            
+            const offset = labelOffsets[mapInfo.id] || DEFAULT_OFFSET; // Default
+            
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'leader-line-svg');
+            
+            const line = document.createElementNS(svgNS, 'line');
+            line.setAttribute('x1', '0');
+            line.setAttribute('y1', '0');
+            line.setAttribute('x2', String(offset.x));
+            line.setAttribute('y2', String(offset.y));
+            svg.appendChild(line);
+
+            const labelContent = document.createElement('div');
+            labelContent.className = 'map-label-content';
+            labelContent.style.transform = `translate(${offset.x}px, ${offset.y}px)`;
+            
+            // ทำให้ลากได้
+            enableDragging(labelContent, mapInfo.id);
+
+            const numberCircle = document.createElement('div');
+            numberCircle.className = `map-label-number`;
+            numberCircle.textContent = index + 1;
+
+            const labelText = document.createElement('div');
+            labelText.className = `map-label-text`;
+            labelText.textContent = mapInfo.name;
+
+            labelContent.appendChild(numberCircle);
+            labelContent.appendChild(labelText);
+            
+            container.appendChild(dot);
+            container.appendChild(svg);
+            container.appendChild(labelContent);
+            mapMarkersContainer.appendChild(container);
+        });
+    }
+
+    function updateCodeOutput() {
+        const codeString = `const labelOffsets = ${JSON.stringify(labelOffsets, null, 4)};`;
+        codeOutput.textContent = codeString;
+    }
+
+    function copyCodeToClipboard() {
+        navigator.clipboard.writeText(codeOutput.textContent).then(() => {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'คัดลอกแล้ว!';
+            copyBtn.classList.replace('bg-blue-600', 'bg-green-600');
+            copyBtn.classList.replace('hover:bg-blue-700', 'hover:bg-green-700');
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.classList.replace('bg-green-600', 'bg-blue-600');
+                copyBtn.classList.replace('hover:bg-green-700', 'hover:bg-blue-700');
+            }, 2000);
+        }).catch(err => {
+            console.error('ไม่สามารถคัดลอกได้: ', err);
+        });
+    }
+    
+    function enableDragging(element, id) {
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+
+        element.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const currentOffset = labelOffsets[id] || DEFAULT_OFFSET;
+            initialX = currentOffset.x;
+            initialY = currentOffset.y;
+            
+            element.style.cursor = 'grabbing';
+            element.style.zIndex = '10000'; // Make sure it's on top
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            
+            const newX = initialX + dx;
+            const newY = initialY + dy;
+            
+            // Update state
+            if (!labelOffsets[id]) {
+                labelOffsets[id] = {x:0, y:0};
+            }
+            labelOffsets[id].x = newX;
+            labelOffsets[id].y = newY;
+            
+            // Re-render and update everything
+            renderAllMarkers();
+            updateCodeOutput();
+            
+            // Update input fields in the control panel
+            const inputX = document.querySelector(`input[data-id="${id}"][data-axis="x"]`);
+            const inputY = document.querySelector(`input[data-id="${id}"][data-axis="y"]`);
+            if (inputX) inputX.value = newX;
+            if (inputY) inputY.value = newY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                element.style.cursor = 'move';
+                element.style.zIndex = '999';
+            }
+        });
+    }
+
+    // --- Start the app ---
+    initialize();
+</script>
+</body>
+</html>
